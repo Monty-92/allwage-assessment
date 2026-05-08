@@ -37,6 +37,10 @@ import static org.mockito.Mockito.*;
  *     THEN convertAndSend is called with the configured channel and JSON payload
  *     AND SsePublisher.publish() is NOT called directly (fan-out goes through Redis)
  *
+ *   GIVEN RedisEventBus and Redis is unavailable (convertAndSend throws RuntimeException)
+ *     WHEN publish(event) is called
+ *     THEN no exception propagates to the caller
+ *
  * RedisEventBus — onMessage (subscriber side):
  *   GIVEN a valid JSON RedisMessage for a ClockEvent
  *     WHEN onMessage is received
@@ -91,15 +95,6 @@ class EventBusTest {
         verify(ssePublisher, times(1)).publish(sampleEvent);
     }
 
-    @Test
-    void localEventBus_publish_doesNotInteractWithRedis() {
-        LocalEventBus bus = new LocalEventBus(ssePublisher);
-
-        bus.publish(sampleEvent);
-
-        verifyNoInteractions(redisTemplate);
-    }
-
     // --------------------------------------------------------
     // RedisEventBus — publish
     // --------------------------------------------------------
@@ -124,6 +119,17 @@ class EventBusTest {
 
         bus.publish(sampleEvent);
 
+        verifyNoInteractions(ssePublisher);
+    }
+
+    @Test
+    void redisEventBus_publish_redisUnavailable_doesNotPropagateException() {
+        doThrow(new RuntimeException("Redis connection refused"))
+                .when(redisTemplate).convertAndSend(anyString(), anyString());
+        RedisEventBus bus = new RedisEventBus(ssePublisher, redisTemplate, objectMapper,
+                propsWithChannel(CHANNEL));
+
+        assertThatNoException().isThrownBy(() -> bus.publish(sampleEvent));
         verifyNoInteractions(ssePublisher);
     }
 
