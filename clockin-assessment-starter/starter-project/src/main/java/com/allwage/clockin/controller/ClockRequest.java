@@ -1,33 +1,26 @@
-package com.allwage.clockin.controller;
+﻿package com.allwage.clockin.controller;
 
-import com.allwage.clockin.model.ClockEvent.ClockType;
+import com.allwage.clockin.model.ClockType;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.ZonedDateTime;
 
 /**
- * Request body for clock-in/out endpoint.
- *
- * Timestamps should be provided in ISO-8601 format.
- * All times are assumed to be in SAST (South African Standard Time, UTC+2).
+ * Request body for POST /api/clocks.
+ * eventId is the client-supplied idempotency key — used as the document ID.
+ * siteId must identify a site in which the employee is enrolled.
  */
 public record ClockRequest(
-    @NotBlank(message = "Employee ID is required")
-    String employeeId,
-
-    @NotNull(message = "Timestamp is required")
-    ZonedDateTime timestamp,
-
-    @NotNull(message = "Latitude is required")
-    Double latitude,
-
-    @NotNull(message = "Longitude is required")
-    Double longitude,
-
-    @NotNull(message = "Accuracy is required")
-    Double accuracyMeters,
-
-    @NotNull(message = "Clock type is required")
-    ClockType type
+        @NotBlank String eventId,
+        @NotBlank String employeeId,
+        @NotBlank String siteId,
+        @NotNull ZonedDateTime timestamp,
+        @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
+        @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
+        @NotNull @Min(0) Double accuracyMeters,
+        @NotNull ClockType type
 ) {}
