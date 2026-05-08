@@ -38,17 +38,22 @@ public class ManagementController {
     @PostMapping("/api/sites")
     public @NonNull ResponseEntity<Site> createSite(
             @Valid @RequestBody @NonNull CreateSiteRequest request) {
-        throw new UnsupportedOperationException("not implemented");
+        Site site = siteService.createSite(request);
+        return ResponseEntity
+                .created(resourceUri(site.id()))
+                .body(site);
     }
 
     @GetMapping("/api/sites")
     public @NonNull ResponseEntity<List<Site>> getAllSites() {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(siteService.findAll());
     }
 
     @GetMapping("/api/sites/{id}")
     public @NonNull ResponseEntity<Site> getSiteById(@PathVariable @NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        return siteService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // --- Teams ---
@@ -56,17 +61,22 @@ public class ManagementController {
     @PostMapping("/api/teams")
     public @NonNull ResponseEntity<Team> createTeam(
             @Valid @RequestBody @NonNull CreateTeamRequest request) {
-        throw new UnsupportedOperationException("not implemented");
+        Team team = teamService.createTeam(request);
+        return ResponseEntity
+                .created(resourceUri(team.id()))
+                .body(team);
     }
 
     @GetMapping("/api/teams")
     public @NonNull ResponseEntity<List<Team>> getAllTeams() {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(teamService.findAll());
     }
 
     @GetMapping("/api/teams/{id}")
     public @NonNull ResponseEntity<Team> getTeamById(@PathVariable @NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        return teamService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     // --- Employees ---
@@ -74,16 +84,29 @@ public class ManagementController {
     @PostMapping("/api/employees")
     public @NonNull ResponseEntity<Employee> createEmployee(
             @Valid @RequestBody @NonNull CreateEmployeeRequest request) {
-        throw new UnsupportedOperationException("not implemented");
+        Employee employee = employeeService.createEmployee(request);
+        return ResponseEntity
+                .created(resourceUri(employee.id()))
+                .body(employee);
     }
 
     @GetMapping("/api/employees")
     public @NonNull ResponseEntity<List<Employee>> getAllEmployees() {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(employeeService.findAll());
     }
 
     @GetMapping("/api/employees/{id}")
     public @NonNull ResponseEntity<Employee> getEmployeeById(@PathVariable @NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        return employeeService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    private java.net.URI resourceUri(String id) {
+        return org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(id)
+                .toUri();
     }
 }
