@@ -1,4 +1,4 @@
-﻿package com.allwage.clockin.controller;
+package com.allwage.clockin.controller;
 
 import com.allwage.clockin.model.ClockType;
 import jakarta.validation.constraints.DecimalMax;
