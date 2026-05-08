@@ -19,7 +19,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 .\mvnw.cmd --batch-mode clean verify
 ```
 
-All 93 tests must be green before submitting.
+All 99 tests must be green before submitting.
 
 ### Run the Service
 
@@ -59,6 +59,20 @@ curl -X POST http://localhost:8080/api/clocks \
 curl -N http://localhost:8080/api/clocks/stream
 ```
 
+### Multi-Instance Redis Fan-out (Optional)
+
+By default the service runs in single-node mode — SSE events are pushed to clients on the same JVM instance. To enable Redis-backed cross-instance fan-out:
+
+```bash
+# Set via environment variables (or application.properties override)
+APP_SSE_REDIS_ENABLED=true
+APP_SSE_REDIS_CHANNEL=clock-events          # default, change if needed
+SPRING_DATA_REDIS_HOST=<your-redis-host>
+SPRING_DATA_REDIS_PORT=6379
+```
+
+When `APP_SSE_REDIS_ENABLED=true`, each clock-in serializes the `ClockEvent` as JSON and publishes it to the Redis channel. Every JVM instance subscribes to that channel and forwards deserialized events to its own local SSE emitters.
+
 ---
 
 ## 2. What Is Implemented
@@ -83,13 +97,14 @@ curl -N http://localhost:8080/api/clocks/stream
 | Management API (POST/GET /api/sites, /api/teams, /api/employees) | Done |
 | Approval resolution (`POST /api/clocks/{id}/approve` and `POST /api/clocks/{id}/reject`) | Done |
 | Daily WhatsApp summary (`@Scheduled` morning + evening cron, grouped by site) | Done |
+| Cross-instance SSE fan-out via Redis pub/sub (`EventBus` abstraction, `LocalEventBus` / `RedisEventBus`) | Done |
 
 ### What Is Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | Daily WhatsApp summary | ~~Priority #5~~ **Implemented** — `DailySummaryService` with morning/evening cron, enabled by `app.summary.enabled=true` |
-| Cross-instance SSE fan-out | Requires Redis/Kafka; documented limitation |
+| Cross-instance SSE fan-out | ~~Requires Redis/Kafka; documented limitation~~ **Implemented** — `EventBus` abstraction; enable with `APP_SSE_REDIS_ENABLED=true` |
 | Authentication / authorisation | Not in assessment scope |
 | Persistent database | In-memory only per spec |
 
@@ -115,9 +130,9 @@ The dashboard is read-only (server pushes, client only reads). SSE is the correc
 
 ## 4. What I Would Do With More Time
 
-1. **Cross-instance SSE fan-out** — replace in-memory `SsePublisher` with Redis pub/sub: publish events to a topic on ingest, each JVM instance subscribes and forwards to its local emitters.
-2. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
-3. **Timezone-aware summary** — make the SAST/UTC offset configurable via `app.summary.timezone` rather than hard-coded `+02:00`.
+1. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
+2. **Timezone-aware summary** — make the SAST/UTC offset configurable via `app.summary.timezone` rather than hard-coded `+02:00`.
+3. **Integration test with embedded Redis** — use `Testcontainers` to start a real Redis container and exercise the `RedisEventBus` publish/subscribe path end-to-end.
 
 ---
 
