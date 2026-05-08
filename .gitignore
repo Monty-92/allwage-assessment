@@ -1,6 +1,9 @@
 # Local Copilot config (not committed)
 .github/copilot-instructions.md
 
+# Interview / prep output (local only, not for submission)
+results/
+
 # PDFs
 *.pdf
 
