@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.ZonedDateTime;
 
@@ -15,7 +16,10 @@ import java.time.ZonedDateTime;
  * siteId must identify a site in which the employee is enrolled.
  */
 public record ClockRequest(
-        @NotBlank String eventId,
+        @NotBlank
+        @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                 message = "eventId must be a valid UUID")
+        String eventId,
         @NotBlank String employeeId,
         @NotBlank String siteId,
         @NotNull ZonedDateTime timestamp,
