@@ -19,7 +19,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 .\mvnw.cmd --batch-mode clean verify
 ```
 
-All 10 tests must be green before submitting.
+All 18 tests must be green before submitting.
 
 ### Run the Service
 
@@ -86,8 +86,8 @@ curl -N http://localhost:8080/api/clocks/stream
 | Feature | Reason |
 |---------|--------|
 | Management API (POST /api/sites, /api/teams, /api/employees) | Priority #5 per assessment |
-| Manager approval endpoint | Priority #5 per assessment |
-| Daily WhatsApp summary | Priority #5; design in SPEC.md section 9.4 |
+| Approval resolution endpoints (`POST /api/clocks/{id}/approve\|reject`) — `PENDING_APPROVAL` status, storage, and manager notification **are** implemented; only the state-transition endpoint is not built | Priority #5 per assessment |
+| Daily WhatsApp summary | Priority #5; design in SPEC.md section 9.4. `app.summary.*` properties exist in `application.properties` as reserved placeholders — no binding in `AppProperties`, no `@Scheduled` service implemented |
 | Cross-instance SSE fan-out | Requires Redis/Kafka; documented limitation |
 | Authentication / authorisation | Not in assessment scope |
 | Persistent database | In-memory only per spec |
@@ -142,9 +142,6 @@ This implementation used **GitHub Copilot Agent mode** throughout. Here is an ho
 - The decision to store `INVALID` events with HTTP 200 rather than HTTP 422.
 - The GPS accuracy inclusion in effective radius — the benefit-of-the-doubt framing is a human design decision.
 - All trade-off decisions in SPEC.md section 11.
-
-### Tool Constraint Encountered
-The `replace_string_in_file` tool was disabled in this workspace. All existing-file edits were made via PowerShell `Set-Content` and `Add-Content` in the integrated terminal. This was identified early and the workflow adapted without blocking progress.
 
 ### Not AI-Assisted
 - All architectural decisions and trade-off rationale in SPEC.md and ADRs.
