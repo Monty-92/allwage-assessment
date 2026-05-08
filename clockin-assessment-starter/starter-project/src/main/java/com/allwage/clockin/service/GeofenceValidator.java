@@ -32,6 +32,9 @@ public class GeofenceValidator {
     public ValidationStatus validate(List<Geofence> geofences, double lat, double lon,
                                      double accuracyMeters, EffectiveRules rules,
                                      ZonedDateTime clockTime) {
+        if (geofences == null) {
+            return rules.approvalRequired() ? ValidationStatus.PENDING_APPROVAL : ValidationStatus.INVALID;
+        }
         for (Geofence geofence : geofences) {
             if (!isTemporallyActive(geofence.schedule(), clockTime)) {
                 continue;

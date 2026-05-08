@@ -27,6 +27,9 @@ public class RuleResolver {
     public EffectiveRules resolveRules(Site site, Team team, Employee employee,
                                        String siteId, ZonedDateTime clockTime) {
         SiteRules base = site.rules();
+        if (base == null) {
+            throw new IllegalStateException("Site " + site.id() + " has no rules configured");
+        }
 
         // Level 1: start with site defaults
         int tolerance = base.toleranceMeters();
