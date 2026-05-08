@@ -19,7 +19,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 .\mvnw.cmd --batch-mode clean verify
 ```
 
-All 42 tests must be green before submitting.
+All 45 tests must be green before submitting.
 
 ### Run the Service
 
