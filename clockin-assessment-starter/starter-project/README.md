@@ -59,6 +59,59 @@ curl -X POST http://localhost:8080/api/clocks \
 curl -N http://localhost:8080/api/clocks/stream
 ```
 
+### Management API — Sample Requests
+
+Create a site (generates server-side ID):
+
+```bash
+curl -s -X POST http://localhost:8080/api/sites \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Beta Warehouse",
+    "managerPhoneNumber": "+27821000099",
+    "rules": { "toleranceMeters": 30, "strictModeWindows": [], "approvalRequired": false },
+    "geofences": [{
+      "id": "fence-beta-main",
+      "name": "Main Gate",
+      "centerLat": -26.2100, "centerLon": 28.0500,
+      "radiusMeters": 100,
+      "schedule": {
+        "operatingHours": {
+          "MONDAY":    { "from": "06:00", "to": "18:00" },
+          "TUESDAY":   { "from": "06:00", "to": "18:00" },
+          "WEDNESDAY": { "from": "06:00", "to": "18:00" },
+          "THURSDAY":  { "from": "06:00", "to": "18:00" },
+          "FRIDAY":    { "from": "06:00", "to": "18:00" }
+        },
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2026-12-31"
+      }
+    }]
+  }'
+```
+
+Create a team (rules fields are nullable — `null` means inherit from site):
+
+```bash
+# Response from POST /api/sites gives the site ID — substitute below
+curl -s -X POST http://localhost:8080/api/teams \
+  -H 'Content-Type: application/json' \
+  -d '{ "siteId": "<site-id>", "name": "Day Shift", "rules": { "toleranceMeters": null, "strictModeWindows": null, "approvalRequired": null } }'
+```
+
+Create an employee enrolled at a site:
+
+```bash
+curl -s -X POST http://localhost:8080/api/employees \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Jane Smith",
+    "phoneNumber": "+27821000050",
+    "siteEnrollments": { "<site-id>": "<team-id>" },
+    "ruleOverrides": null
+  }'
+```
+
 ### Multi-Instance Redis Fan-out (Optional)
 
 By default the service runs in single-node mode — SSE events are pushed to clients on the same JVM instance. To enable Redis-backed cross-instance fan-out:
@@ -92,21 +145,35 @@ When `APP_SSE_REDIS_ENABLED=true`, each clock-in serializes the `ClockEvent` as 
 | WhatsApp notification to employee | Done |
 | WhatsApp notification to manager (PENDING_APPROVAL) | Done |
 | Notification idempotency guard | Done |
-| Seed data (1 site, 2 geofences, 3 employees, 2 teams) | Done |
+| Seed data (1 site, 2 geofences, 3 employees, 2 teams) | Done — `site-alpha`, employees `emp-alice` / `emp-bob` / `emp-john`, teams `team-day-shift` / `team-contractors` |
 | AppProperties config binding + env var overrides | Done |
 | Management API (POST/GET /api/sites, /api/teams, /api/employees) | Done |
 | Approval resolution (`POST /api/clocks/{id}/approve` and `POST /api/clocks/{id}/reject`) | Done |
 | Daily WhatsApp summary (`@Scheduled` morning + evening cron, grouped by site) | Done |
 | Cross-instance SSE fan-out via Redis pub/sub (`EventBus` abstraction, `LocalEventBus` / `RedisEventBus`) | Done |
 
+### What Was Added Beyond the Original Spec
+
+The SPEC.md was written before any implementation and originally scoped out four features due to the 2.5 h time constraint. All four were implemented in subsequent phases:
+
+| Feature | Phase | How to enable |
+|---------|-------|---------------|
+| Management API (`POST/GET /api/sites`, `/api/teams`, `/api/employees`) | Phase A | Available by default |
+| Approval flow (`POST /api/clocks/{id}/approve` + `reject`) | Phase B | Available by default |
+| Daily WhatsApp summary (morning + evening cron) | Phase C | `APP_SUMMARY_ENABLED=true` |
+| Cross-instance SSE fan-out via Redis pub/sub | Phase D | `APP_SSE_REDIS_ENABLED=true` |
+
 ### What Is Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Daily WhatsApp summary | ~~Priority #5~~ **Implemented** — `DailySummaryService` with morning/evening cron, enabled by `app.summary.enabled=true` |
-| Cross-instance SSE fan-out | ~~Requires Redis/Kafka; documented limitation~~ **Implemented** — `EventBus` abstraction; enable with `APP_SSE_REDIS_ENABLED=true` |
 | Authentication / authorisation | Not in assessment scope |
-| Persistent database | In-memory only per spec |
+| Persistent database | In-memory only per assessment requirement |
+| Polygon geofencing | Explicitly excluded by PRD |
+| Multi-timezone support | Explicitly excluded by PRD (SAST only) |
+| WhatsApp retry / dead-letter queue | Log-and-continue; see "What I Would Do" |
+| PATCH / DELETE on Management API | Create + read sufficient for this assessment |
+| RedisEventBus end-to-end integration test | Requires live Redis via Testcontainers; see "What I Would Do" |
 
 ---
 
@@ -130,9 +197,17 @@ The dashboard is read-only (server pushes, client only reads). SSE is the correc
 
 ## 4. What I Would Do With More Time
 
-1. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
-2. **Timezone-aware summary** — make the SAST/UTC offset configurable via `app.summary.timezone` rather than hard-coded `+02:00`.
-3. **Integration test with embedded Redis** — use `Testcontainers` to start a real Redis container and exercise the `RedisEventBus` publish/subscribe path end-to-end.
+**Operational hardening:**
+
+1. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications. The current log-and-continue strategy is safe but silent.
+2. **Pagination for `GET /api/clocks`** — the endpoint returns all events as a single JSON array. In production this scan is unbounded. Cursor-based pagination keyed on `timestamp` would be the right fix.
+3. **Integration test with embedded Redis** — use `Testcontainers` to start a real Redis container and exercise the full `RedisEventBus` publish → subscribe → SSE-deliver path end-to-end.
+
+**What I discovered during implementation that would change my spec:**
+
+4. **Timezone serialization is subtle** — `ZonedDateTime` deserialization with Jackson requires explicit configuration (`WRITE_DATES_AS_TIMESTAMPS=false`, `ADJUST_DATES_TO_CONTEXT_TIME_ZONE=false`) to preserve the client's offset. I would add this explicitly to the SPEC.md API contract section rather than relying on Spring Boot's auto-configuration.
+5. **Approval flow scope creep** — the approval endpoint (`POST /api/clocks/{id}/approve`) is simple to implement but creates a state-machine (PENDING_APPROVAL → VALID/INVALID) that deserves its own SPEC section. I would expand SPEC.md section 6 to document this transition diagram and the 409 semantics upfront.
+6. **Timezone-aware summary** — the daily summary cron uses server-local time, not SAST. For a SAST-first system the summary time should be driven by `ZoneId.of("Africa/Johannesburg")`, not `LocalDate.now()`. I would make this explicit via `app.summary.timezone` in application.properties.
 
 ---
 

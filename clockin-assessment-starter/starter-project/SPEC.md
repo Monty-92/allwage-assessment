@@ -77,13 +77,13 @@ All answers derived from Doc Discovery Q&A (2026-05-08). No requirements are inv
 |---|------------|-----------|
 | A1 | Mobile app sends `siteId` in the request | GPS-only site lookup is ambiguous when geofences overlap |
 | A2 | Team enrollment embedded in Employee as `Map<siteId, teamId>` | An employee can be assigned to multiple sites; a flat `teamId` is insufficient |
-| A3 | No management API — seed data loaded at startup | 2.5 h constraint; management plane is priority #5 |
+| A3 | No management API — seed data loaded at startup | 2.5 h constraint; management plane is priority #5 — **superseded: Management API implemented (Phase A)** |
 | A4 | Client supplies `eventId` UUID in every request | Fixes `UUID.randomUUID()` duplicate bug; natural-key alternatives need range scans |
 | A5 | Duplicate `eventId` -> silent 200 replay | Transparent retry for mobile app; a 409 would surface an error to the employee |
 | A6 | `effectiveRadius = geofence.radius + rules.tolerance + accuracyMeters` | Benefit-of-the-doubt for hardware GPS quality |
 | A7 | Invalid clock-ins stored with `INVALID`, returned HTTP 200 | Immutable compliance record; 4xx implies malformed request |
-| A8 | `approvalRequired=true` outside geofence -> PENDING_APPROVAL, notify manager | 2.5 h constraint; no approval endpoint |
-| A9 | Daily WhatsApp summary out of scope | Priority #5; design only in section 9.4 |
+| A8 | `approvalRequired=true` outside geofence -> PENDING_APPROVAL, notify manager | 2.5 h constraint; no approval endpoint — **superseded: approval endpoint implemented (Phase B)** |
+| A9 | Daily WhatsApp summary out of scope | Priority #5; design only in section 9.4 — **superseded: daily summary implemented (Phase C)** |
 | A10 | SSE streaming is single-instance only | Cross-instance fan-out requires out-of-process broker |
 | A11 | WhatsApp message templates defined by implementer | PRD is silent on wording |
 | A12 | WhatsApp failure -> log WARN, continue | Audit record must not depend on third-party availability |
@@ -95,17 +95,19 @@ All answers derived from Doc Discovery Q&A (2026-05-08). No requirements are inv
 
 ## 4. Out of Scope
 
-| Item | Reason |
-|------|--------|
-| Management API (`POST /api/sites`, `/api/teams`, `/api/employees`) | Priority #5; 2.5 h constraint |
-| Manager approval endpoint | Priority #5; significant scope |
-| Daily WhatsApp summary | Priority #5; section 9.4 covers the design |
-| Polygon geofencing | Explicitly excluded by PRD |
-| Multi-timezone support | Explicitly excluded by PRD (SAST only) |
-| Cross-instance SSE fan-out | Requires Kafka / Redis pub/sub |
-| WhatsApp retry / dead-letter queue | Log-and-continue only |
-| Authentication / authorisation | Not mentioned in PRD for this assessment |
-| Persistent storage | In-memory only per assessment requirement |
+> **Implementation note (post-spec):** This spec was written before any implementation (Status: Final — see header). Four items originally listed below as out of scope — Management API, Manager approval endpoint, Daily WhatsApp summary, and Cross-instance SSE fan-out — were subsequently implemented in phases A–D beyond the initial 2.5 h spec window. See README.md → _What Was Added Beyond the Original Spec_ for details. The items remain here for historical accuracy; their status is annotated inline.
+
+| Item | Reason | Status |
+|------|--------|--------|
+| Management API (`POST /api/sites`, `/api/teams`, `/api/employees`) | Priority #5; 2.5 h constraint | **Implemented — Phase A** |
+| Manager approval endpoint | Priority #5; significant scope | **Implemented — Phase B** |
+| Daily WhatsApp summary | Priority #5; section 9.4 covers the design | **Implemented — Phase C** |
+| Polygon geofencing | Explicitly excluded by PRD | Out of scope |
+| Multi-timezone support | Explicitly excluded by PRD (SAST only) | Out of scope |
+| Cross-instance SSE fan-out | Requires Kafka / Redis pub/sub | **Implemented — Phase D** |
+| WhatsApp retry / dead-letter queue | Log-and-continue only | Out of scope |
+| Authentication / authorisation | Not mentioned in PRD for this assessment | Out of scope |
+| Persistent storage | In-memory only per assessment requirement | Out of scope |
 
 ---
 
@@ -415,9 +417,11 @@ Guard key: `"notif:{eventId}"` in `notifications` collection. Check before send;
 
 If `sendMessage()` returns false or throws: log WARN with `eventId` + phone, do not persist guard key, continue. Clock-in response is unaffected.
 
-### 9.4 Daily Summary — Design Only (Out of Scope)
+### 9.4 Daily Summary — Implemented (Phase C)
 
-Future `@Scheduled` task scanning today's clocks, grouping by site, sending summary to manager.
+> **Implementation note:** Originally designed only; subsequently implemented as `DailySummaryService`. Enable with `APP_SUMMARY_ENABLED=true`.
+
+`@Scheduled` task scanning today's clocks, grouping by site, sending summary to manager.
 
 | Property | Environment variable | Default |
 |----------|---------------------|---------|
@@ -438,9 +442,9 @@ Spring Boot relaxed binding: `APP_X_Y_Z` maps to `app.x.y.z`.
 | `app.sse.emitter-timeout-ms` | `APP_SSE_EMITTER_TIMEOUT_MS` | `0` | SSE emitter timeout ms; 0 = no timeout |
 | `app.notifications.enabled` | `APP_NOTIFICATIONS_ENABLED` | `true` | Master switch for WhatsApp; set `false` in test profiles |
 | `app.seed-data.enabled` | `APP_SEED_DATA_ENABLED` | `true` | Load seed data at startup; set `false` for empty store |
-| `app.summary.morning-cron` | `APP_SUMMARY_MORNING_CRON` | `0 0 6 * * MON-FRI` | Morning summary cron (future) |
-| `app.summary.evening-cron` | `APP_SUMMARY_EVENING_CRON` | `0 0 18 * * MON-FRI` | Evening summary cron (future) |
-| `app.summary.enabled` | `APP_SUMMARY_ENABLED` | `false` | Enable daily summaries (future) |
+| `app.summary.morning-cron` | `APP_SUMMARY_MORNING_CRON` | `0 0 6 * * MON-FRI` | Morning summary cron |
+| `app.summary.evening-cron` | `APP_SUMMARY_EVENING_CRON` | `0 0 18 * * MON-FRI` | Evening summary cron |
+| `app.summary.enabled` | `APP_SUMMARY_ENABLED` | `false` | Enable daily summaries (implemented; disabled by default) |
 
 Physical constant (hardcoded): `EARTH_RADIUS_METERS` = 6,371,000 m.
 
