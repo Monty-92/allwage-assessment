@@ -55,7 +55,7 @@ class ClockServiceTest {
     private NotificationService notificationService;
 
     @Mock
-    private SsePublisher ssePublisher;
+    private EventBus eventBus;
 
     private DocumentStore store;
     private ClockService service;
@@ -68,7 +68,7 @@ class ClockServiceTest {
     void setUp() {
         store = new DocumentStore();
         service = new ClockService(store, new RuleResolver(new AppProperties()), new GeofenceValidator(),
-                notificationService, ssePublisher);
+                notificationService, eventBus);
 
         Map<DayOfWeek, TimeRange> hours = Map.of(
                 DayOfWeek.MONDAY,    new TimeRange(LocalTime.of(6, 0), LocalTime.of(18, 0)),
@@ -110,7 +110,7 @@ class ClockServiceTest {
         assertThat(result.validationStatus()).isEqualTo(ValidationStatus.VALID);
         assertThat(store.findById("clocks", EVENT_ID, ClockEvent.class)).isPresent();
         verify(notificationService).notify(any(), any(), any(), any(), any());
-        verify(ssePublisher).publish(any());
+        verify(eventBus).publish(any());
     }
 
     // ---- Not-found failure paths ----
@@ -134,7 +134,7 @@ class ClockServiceTest {
                                 .isEqualTo(HttpStatus.NOT_FOUND));
 
         verify(notificationService, never()).notify(any(), any(), any(), any(), any());
-        verify(ssePublisher, never()).publish(any());
+        verify(eventBus, never()).publish(any());
     }
 
     /**
@@ -225,7 +225,7 @@ class ClockServiceTest {
 
         // Side effects triggered exactly once across both calls
         verify(notificationService, times(1)).notify(any(), any(), any(), any(), any());
-        verify(ssePublisher, times(1)).publish(any());
+        verify(eventBus, times(1)).publish(any());
     }
 
     // ---- Validation outcomes ----
