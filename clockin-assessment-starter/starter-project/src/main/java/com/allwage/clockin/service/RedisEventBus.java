@@ -8,6 +8,12 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+
 /**
  * Cross-instance {@link EventBus} implementation backed by Redis pub/sub.
  *
@@ -26,6 +32,8 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.sse.redis-enabled", havingValue = "true")
 public class RedisEventBus implements EventBus, MessageListener {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisEventBus.class);
 
     private final SsePublisher ssePublisher;
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
@@ -46,7 +54,12 @@ public class RedisEventBus implements EventBus, MessageListener {
     /** Publish by sending the JSON-serialized event to the Redis pub/sub channel. */
     @Override
     public void publish(@NonNull ClockEvent event) {
-        throw new UnsupportedOperationException("not implemented");
+        try {
+            String json = objectMapper.writeValueAsString(event);
+            redisTemplate.convertAndSend(channel, json);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize ClockEvent for Redis publish: eventId={}", event.id(), e);
+        }
     }
 
     /**
@@ -56,6 +69,11 @@ public class RedisEventBus implements EventBus, MessageListener {
      */
     @Override
     public void onMessage(@NonNull Message message, @Nullable byte[] pattern) {
-        throw new UnsupportedOperationException("not implemented");
+        try {
+            ClockEvent event = objectMapper.readValue(message.getBody(), ClockEvent.class);
+            ssePublisher.publish(event);
+        } catch (IOException e) {
+            log.error("Failed to deserialize ClockEvent from Redis channel: {}", e.getMessage(), e);
+        }
     }
 }
