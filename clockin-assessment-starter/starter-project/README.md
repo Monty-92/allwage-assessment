@@ -150,3 +150,19 @@ This implementation used **GitHub Copilot Agent mode** throughout. Here is an ho
 
 ### Verification
 After every agent-generated file, the full test suite was run with `.\mvnw.cmd clean verify`. No agent output was accepted without a green test run.
+
+### Show a Prompt That Failed
+
+**Prompt:** "Implement `RuleResolver` with a three-level cascade where each level can override
+the previous. Site is the base, team overrides non-null fields, employee overrides non-null fields."
+
+**What went wrong:** Copilot generated a sentinel-value approach — `toleranceMeters = -1` meant
+"not set", and the resolver checked `if (value != -1)` to detect overrides. This is semantically
+incorrect: `-1` is an arbitrary magic number that could conflict with a legitimate value, and the
+pattern does not compose cleanly when there are three levels of override. The output was rejected.
+
+**Fix — two iterations:**
+1. Rejected the sentinel output immediately. Re-prompted with: "Use `Integer` (nullable) for
+   `toleranceMeters` in `TeamRules` and `EmployeeRules`. `null` means inherit from the parent level.
+   Never use sentinel values. Each field resolves independently."
+2. Second attempt produced the correct null-inheritance pattern used in the final implementation.
