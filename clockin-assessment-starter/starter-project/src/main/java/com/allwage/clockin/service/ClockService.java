@@ -37,18 +37,18 @@ public class ClockService {
     private final RuleResolver ruleResolver;
     private final GeofenceValidator geofenceValidator;
     private final NotificationService notificationService;
-    private final SsePublisher ssePublisher;
+    private final EventBus eventBus;
 
     public ClockService(@NonNull DocumentStore store,
                         @NonNull RuleResolver ruleResolver,
                         @NonNull GeofenceValidator geofenceValidator,
                         @NonNull NotificationService notificationService,
-                        @NonNull SsePublisher ssePublisher) {
+                        @NonNull EventBus eventBus) {
         this.store = store;
         this.ruleResolver = ruleResolver;
         this.geofenceValidator = geofenceValidator;
         this.notificationService = notificationService;
-        this.ssePublisher = ssePublisher;
+        this.eventBus = eventBus;
     }
 
     /**
@@ -123,8 +123,8 @@ public class ClockService {
         notificationService.notify(clockEvent, employee.phoneNumber(), employee.name(),
                 site.name(), site.managerPhoneNumber());
 
-        // Step 10: publish SSE
-        ssePublisher.publish(clockEvent);
+        // Step 10: publish SSE event to all connected clients (local or cross-instance via Redis)
+        eventBus.publish(clockEvent);
 
         return clockEvent;
     }
@@ -155,7 +155,7 @@ public class ClockService {
                 event.accuracyMeters(), event.type(),
                 ValidationStatus.VALID, null);
         store.save("clocks", approved.id(), approved);
-        ssePublisher.publish(approved);
+        eventBus.publish(approved);
         log.info("Clock event approved: id={}", id);
         return approved;
     }
@@ -179,7 +179,7 @@ public class ClockService {
                 event.accuracyMeters(), event.type(),
                 ValidationStatus.INVALID, "Rejected by manager");
         store.save("clocks", rejected.id(), rejected);
-        ssePublisher.publish(rejected);
+        eventBus.publish(rejected);
         log.info("Clock event rejected: id={}", id);
         return rejected;
     }

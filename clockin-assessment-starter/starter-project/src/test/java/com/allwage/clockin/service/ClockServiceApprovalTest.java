@@ -41,7 +41,7 @@ class ClockServiceApprovalTest {
     private NotificationService notificationService;
 
     @Mock
-    private SsePublisher ssePublisher;
+    private EventBus eventBus;
 
     private DocumentStore store;
     private ClockService service;
@@ -50,7 +50,7 @@ class ClockServiceApprovalTest {
     void setUp() {
         store = new DocumentStore();
         service = new ClockService(store, new RuleResolver(new AppProperties()),
-                new GeofenceValidator(), notificationService, ssePublisher);
+                new GeofenceValidator(), notificationService, eventBus);
     }
 
     private void savePendingEvent() {
@@ -97,7 +97,7 @@ class ClockServiceApprovalTest {
 
         service.approve(EVENT_ID);
 
-        verify(ssePublisher).publish(any(ClockEvent.class));
+        verify(eventBus).publish(any(ClockEvent.class));
     }
 
     @Test
@@ -152,7 +152,7 @@ class ClockServiceApprovalTest {
 
         service.reject(EVENT_ID);
 
-        verify(ssePublisher).publish(any(ClockEvent.class));
+        verify(eventBus).publish(any(ClockEvent.class));
     }
 
     @Test

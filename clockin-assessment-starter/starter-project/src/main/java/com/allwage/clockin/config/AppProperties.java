@@ -46,9 +46,17 @@ public class AppProperties {
 
     public static class Sse {
         private long emitterTimeoutMs = 0L;
+        private boolean redisEnabled = false;
+        private String redisChannel = "clock-events";
 
         public long getEmitterTimeoutMs() { return emitterTimeoutMs; }
         public void setEmitterTimeoutMs(long v) { this.emitterTimeoutMs = v; }
+
+        public boolean isRedisEnabled() { return redisEnabled; }
+        public void setRedisEnabled(boolean redisEnabled) { this.redisEnabled = redisEnabled; }
+
+        public String getRedisChannel() { return redisChannel; }
+        public void setRedisChannel(String redisChannel) { this.redisChannel = redisChannel; }
     }
 
     public static class Notifications {

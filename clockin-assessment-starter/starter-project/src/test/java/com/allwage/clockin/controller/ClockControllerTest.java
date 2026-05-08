@@ -1,11 +1,13 @@
 package com.allwage.clockin.controller;
 
 import com.allwage.clockin.model.*;
+import com.allwage.clockin.service.EventBus;
 import com.allwage.clockin.store.DocumentStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
@@ -30,6 +32,9 @@ class ClockControllerTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @MockBean
+    private EventBus eventBus;
 
     @Autowired
     private DocumentStore store;
