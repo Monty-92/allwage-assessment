@@ -1,7 +1,9 @@
 package com.allwage.clockin.config;
 
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Strongly-typed binding for application properties.
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConfigurationProperties(prefix = "app")
+@Validated
 public class AppProperties {
 
     private Geofence geofence = new Geofence();
@@ -47,6 +50,7 @@ public class AppProperties {
     public static class Sse {
         private long emitterTimeoutMs = 0L;
         private boolean redisEnabled = false;
+        @NotBlank
         private String redisChannel = "clock-events";
 
         public long getEmitterTimeoutMs() { return emitterTimeoutMs; }

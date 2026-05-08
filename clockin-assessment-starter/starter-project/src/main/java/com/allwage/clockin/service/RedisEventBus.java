@@ -1,16 +1,17 @@
 package com.allwage.clockin.service;
 
+import com.allwage.clockin.config.AppProperties;
 import com.allwage.clockin.model.ClockEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -36,15 +37,15 @@ public class RedisEventBus implements EventBus, MessageListener {
     private static final Logger log = LoggerFactory.getLogger(RedisEventBus.class);
 
     private final SsePublisher ssePublisher;
-    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
     private final String channel;
 
     public RedisEventBus(
             @NonNull SsePublisher ssePublisher,
-            @NonNull org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
-            @NonNull com.fasterxml.jackson.databind.ObjectMapper objectMapper,
-            @NonNull com.allwage.clockin.config.AppProperties appProperties) {
+            @NonNull StringRedisTemplate redisTemplate,
+            @NonNull ObjectMapper objectMapper,
+            @NonNull AppProperties appProperties) {
         this.ssePublisher  = ssePublisher;
         this.redisTemplate = redisTemplate;
         this.objectMapper  = objectMapper;
@@ -57,8 +58,8 @@ public class RedisEventBus implements EventBus, MessageListener {
         try {
             String json = objectMapper.writeValueAsString(event);
             redisTemplate.convertAndSend(channel, json);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize ClockEvent for Redis publish: eventId={}", event.id(), e);
+        } catch (Exception e) {
+            log.error("Failed to publish ClockEvent to Redis channel: eventId={}", event.id(), e);
         }
     }
 

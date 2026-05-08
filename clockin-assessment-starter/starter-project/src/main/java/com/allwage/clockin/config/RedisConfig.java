@@ -5,8 +5,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.listener.PatternTopic;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Redis infrastructure configuration, active only when {@code app.sse.redis-enabled=true}.
@@ -28,10 +29,18 @@ public class RedisConfig {
             RedisConnectionFactory connectionFactory,
             RedisEventBus eventBus,
             AppProperties appProperties) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("redis-sse-");
+        executor.initialize();
+
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        container.setTaskExecutor(executor);
         container.addMessageListener(eventBus,
-                new PatternTopic(appProperties.getSse().getRedisChannel()));
+                new ChannelTopic(appProperties.getSse().getRedisChannel()));
         return container;
     }
 }
