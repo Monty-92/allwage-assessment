@@ -142,7 +142,22 @@ public class ClockService {
      * Throws 409 Conflict if the event is not in PENDING_APPROVAL state.
      */
     public @NonNull ClockEvent approve(@NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        ClockEvent event = store.findById("clocks", id, ClockEvent.class)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Clock event not found: " + id));
+        if (event.validationStatus() != ValidationStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Event " + id + " is not in PENDING_APPROVAL state: " + event.validationStatus());
+        }
+        ClockEvent approved = new ClockEvent(
+                event.id(), event.employeeId(), event.siteId(),
+                event.timestamp(), event.latitude(), event.longitude(),
+                event.accuracyMeters(), event.type(),
+                ValidationStatus.VALID, null);
+        store.save("clocks", approved.id(), approved);
+        ssePublisher.publish(approved);
+        log.info("Clock event approved: id={}", id);
+        return approved;
     }
 
     /**
@@ -151,7 +166,22 @@ public class ClockService {
      * Throws 409 Conflict if the event is not in PENDING_APPROVAL state.
      */
     public @NonNull ClockEvent reject(@NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        ClockEvent event = store.findById("clocks", id, ClockEvent.class)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Clock event not found: " + id));
+        if (event.validationStatus() != ValidationStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Event " + id + " is not in PENDING_APPROVAL state: " + event.validationStatus());
+        }
+        ClockEvent rejected = new ClockEvent(
+                event.id(), event.employeeId(), event.siteId(),
+                event.timestamp(), event.latitude(), event.longitude(),
+                event.accuracyMeters(), event.type(),
+                ValidationStatus.INVALID, "Rejected by manager");
+        store.save("clocks", rejected.id(), rejected);
+        ssePublisher.publish(rejected);
+        log.info("Clock event rejected: id={}", id);
+        return rejected;
     }
 
     /**

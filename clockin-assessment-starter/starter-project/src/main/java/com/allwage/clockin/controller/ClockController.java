@@ -77,7 +77,7 @@ public class ClockController {
      */
     @PostMapping("/{id}/approve")
     public @NonNull ResponseEntity<ClockEvent> approve(@PathVariable @NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(clockService.approve(id));
     }
 
     /**
@@ -86,6 +86,6 @@ public class ClockController {
      */
     @PostMapping("/{id}/reject")
     public @NonNull ResponseEntity<ClockEvent> reject(@PathVariable @NonNull String id) {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(clockService.reject(id));
     }
 }
