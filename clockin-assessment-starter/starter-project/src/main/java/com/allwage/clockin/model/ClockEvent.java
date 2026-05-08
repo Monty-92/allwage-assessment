@@ -1,25 +1,21 @@
-package com.allwage.clockin.model;
+﻿package com.allwage.clockin.model;
 
 import java.time.ZonedDateTime;
 
 /**
- * Represents a clock-in or clock-out event received from the mobile app.
- *
- * This is the raw event as received - your implementation should determine
- * whether this clock is valid based on geofencing rules.
- *
- * All timestamps are in SAST (South African Standard Time, UTC+2).
+ * Immutable record of a single clock-in or clock-out event.
+ * id == eventId from the request (client-supplied idempotency key).
+ * validationReason is null when validationStatus is VALID.
  */
 public record ClockEvent(
-    String id,
-    String employeeId,
-    ZonedDateTime timestamp,
-    double latitude,
-    double longitude,
-    double accuracyMeters,
-    ClockType type
-) {
-    public enum ClockType {
-        IN, OUT
-    }
-}
+        String id,
+        String employeeId,
+        String siteId,
+        ZonedDateTime timestamp,
+        double latitude,
+        double longitude,
+        double accuracyMeters,
+        ClockType type,
+        ValidationStatus validationStatus,
+        String validationReason
+) {}
