@@ -1,49 +1,56 @@
 package com.allwage.clockin.controller;
 
+import com.allwage.clockin.config.AppProperties;
 import com.allwage.clockin.model.ClockEvent;
 import com.allwage.clockin.service.ClockService;
+import com.allwage.clockin.service.SsePublisher;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
- * REST controller for clock-in/out operations.
- *
- * This provides a basic endpoint for receiving clock events.
- * You'll need to extend this with validation, error handling,
- * and additional endpoints as required.
+ * REST controller for clock-in/out operations and the SSE dashboard stream.
  */
 @RestController
 @RequestMapping("/api/clocks")
 public class ClockController {
 
     private final ClockService clockService;
+    private final SsePublisher ssePublisher;
+    private final AppProperties appProperties;
 
-    public ClockController(@NonNull ClockService clockService) {
+    public ClockController(@NonNull ClockService clockService,
+                           @NonNull SsePublisher ssePublisher,
+                           @NonNull AppProperties appProperties) {
         this.clockService = clockService;
+        this.ssePublisher = ssePublisher;
+        this.appProperties = appProperties;
     }
 
     /**
      * Process a clock-in or clock-out event from the mobile app.
+     * The client-supplied eventId is used as the idempotency key.
+     * Duplicate requests for the same eventId return the stored event unchanged.
      */
     @PostMapping
-    public @NonNull ResponseEntity<ClockEvent> clock(@Valid @RequestBody @NonNull ClockRequest request) {
-        ClockEvent event = new ClockEvent(
-            UUID.randomUUID().toString(),
-            request.employeeId(),
-            request.timestamp(),
-            request.latitude(),
-            request.longitude(),
-            request.accuracyMeters(),
-            request.type()
-        );
+    public @NonNull ResponseEntity<ClockEvent> clock(
+            @Valid @RequestBody @NonNull ClockRequest request) {
+        ClockEvent event = clockService.processClock(request);
+        return ResponseEntity.ok(event);
+    }
 
-        ClockEvent saved = clockService.processClock(event);
-        return ResponseEntity.ok(saved);
+    /**
+     * SSE stream for the real-time dashboard.
+     * Clients connect once and receive a "clock-event" message for every processed event.
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream() {
+        return ssePublisher.subscribe(appProperties.getSse().getEmitterTimeoutMs());
     }
 
     /**
@@ -60,7 +67,7 @@ public class ClockController {
     @GetMapping("/{id}")
     public @NonNull ResponseEntity<ClockEvent> getById(@PathVariable @NonNull String id) {
         return clockService.findById(id)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
