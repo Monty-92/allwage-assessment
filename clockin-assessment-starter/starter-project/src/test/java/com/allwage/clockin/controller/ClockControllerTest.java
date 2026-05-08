@@ -134,6 +134,75 @@ class ClockControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    @Test
+    void clockIn_unknownSiteId_returns404() {
+        String body = """
+                {
+                    "eventId": "550e8400-e29b-41d4-a716-446655440002",
+                    "employeeId": "emp-123",
+                    "siteId": "nonexistent-site",
+                    "timestamp": "2024-01-15T09:00:00+02:00",
+                    "latitude": -26.2041,
+                    "longitude": 28.0473,
+                    "accuracyMeters": 10.0,
+                    "type": "IN"
+                }
+                """;
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/clocks",
+                new HttpEntity<>(body, jsonHeaders()),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void clockIn_unknownEmployeeId_returns404() {
+        String body = """
+                {
+                    "eventId": "550e8400-e29b-41d4-a716-446655440003",
+                    "employeeId": "nonexistent-emp",
+                    "siteId": "test-site",
+                    "timestamp": "2024-01-15T09:00:00+02:00",
+                    "latitude": -26.2041,
+                    "longitude": 28.0473,
+                    "accuracyMeters": 10.0,
+                    "type": "IN"
+                }
+                """;
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/clocks",
+                new HttpEntity<>(body, jsonHeaders()),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void getById_nonexistentId_returns404() {
+        ResponseEntity<String> response = restTemplate.getForEntity(
+                "/api/clocks/nonexistent-event-id",
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void getAll_returns200WithEmptyList() {
+        ResponseEntity<ClockEvent[]> response = restTemplate.getForEntity(
+                "/api/clocks",
+                ClockEvent[].class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull().isEmpty();
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
