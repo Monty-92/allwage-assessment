@@ -137,6 +137,24 @@ public class ClockService {
     }
 
     /**
+     * Approve a PENDING_APPROVAL clock event — transitions it to VALID.
+     * Throws 404 if the event does not exist.
+     * Throws 409 Conflict if the event is not in PENDING_APPROVAL state.
+     */
+    public @NonNull ClockEvent approve(@NonNull String id) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    /**
+     * Reject a PENDING_APPROVAL clock event — transitions it to INVALID.
+     * Throws 404 if the event does not exist.
+     * Throws 409 Conflict if the event is not in PENDING_APPROVAL state.
+     */
+    public @NonNull ClockEvent reject(@NonNull String id) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    /**
      * Get all clock events.
      */
     public @NonNull List<ClockEvent> findAll() {

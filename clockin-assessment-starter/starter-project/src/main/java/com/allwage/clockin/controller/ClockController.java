@@ -70,4 +70,22 @@ public class ClockController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    /**
+     * Approve a PENDING_APPROVAL clock event — transitions it to VALID.
+     * Returns 409 Conflict if the event is not in PENDING_APPROVAL state.
+     */
+    @PostMapping("/{id}/approve")
+    public @NonNull ResponseEntity<ClockEvent> approve(@PathVariable @NonNull String id) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    /**
+     * Reject a PENDING_APPROVAL clock event — transitions it to INVALID.
+     * Returns 409 Conflict if the event is not in PENDING_APPROVAL state.
+     */
+    @PostMapping("/{id}/reject")
+    public @NonNull ResponseEntity<ClockEvent> reject(@PathVariable @NonNull String id) {
+        throw new UnsupportedOperationException("not implemented");
+    }
 }
