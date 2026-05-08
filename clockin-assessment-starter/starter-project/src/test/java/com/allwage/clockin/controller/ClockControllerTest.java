@@ -203,6 +203,35 @@ class ClockControllerTest {
         assertThat(response.getBody()).isNotNull().isEmpty();
     }
 
+    /**
+     * GIVEN a clock-in request where eventId is not a valid UUID
+     * WHEN POST /api/clocks is submitted
+     * THEN the server responds HTTP 400 (validation failure)
+     */
+    @Test
+    void clockIn_invalidEventIdFormat_returns400() {
+        String body = """
+                {
+                    "eventId": "not-a-uuid",
+                    "employeeId": "emp-123",
+                    "siteId": "test-site",
+                    "timestamp": "2024-01-15T09:00:00+02:00",
+                    "latitude": -26.2041,
+                    "longitude": 28.0473,
+                    "accuracyMeters": 10.0,
+                    "type": "IN"
+                }
+                """;
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/clocks",
+                new HttpEntity<>(body, jsonHeaders()),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
