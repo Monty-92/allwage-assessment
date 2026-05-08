@@ -1,78 +1,155 @@
-# AllWage Clock-In Service - Starter Project
+﻿# AllWage Clock-In Service — Assessment Submission
 
-This is the starter project for the AllWage Senior Back-End Engineer technical assessment.
+## 1. Quick Start
 
-## Prerequisites
+### Prerequisites
 
-- Java 21+
-- Maven 3.8+
+- **Java 21** (Eclipse Temurin recommended). No Maven install needed — the Maven Wrapper is included.
+- **JAVA_HOME** pointing to your JDK 21 installation.
 
-## Getting Started
-
-1. Build the project:
-   ```bash
-   mvn clean compile
-   ```
-
-2. Run the application:
-   ```bash
-   mvn spring-boot:run
-   ```
-
-3. Run tests:
-   ```bash
-   mvn test
-   ```
-
-The service will start on `http://localhost:8080`.
-
-## Project Structure
-
-```
-src/main/java/com/allwage/clockin/
-├── ClockInApplication.java    # Application entry point
-├── controller/
-│   ├── ClockController.java   # REST endpoints
-│   └── ClockRequest.java      # Request DTO
-├── model/
-│   ├── ClockEvent.java        # Clock event record
-│   └── Employee.java          # Employee record
-├── service/
-│   ├── ClockService.java      # Clock processing logic
-│   ├── WhatsAppClient.java    # WhatsApp interface
-│   └── WhatsAppClientStub.java # WhatsApp stub implementation
-└── store/
-    └── DocumentStore.java     # In-memory document store
+```bash
+# Windows PowerShell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 ```
 
-## Provided Components
+### Build and Test
 
-- **DocumentStore**: An in-memory NoSQL-style document store. Use this for all data persistence.
-- **WhatsAppClient**: Interface for sending WhatsApp messages. The stub implementation logs messages.
-- **ClockService**: Basic service for processing clock events. Extend this with your implementation.
-- **ClockController**: Basic REST controller. Add endpoints as needed.
+```bash
+.\mvnw.cmd --batch-mode clean verify
+```
 
-## Sample API Usage
+All 10 tests must be green before submitting.
 
-Clock in:
+### Run the Service
+
+```bash
+.\mvnw.cmd spring-boot:run
+```
+
+| Endpoint | Port |
+|----------|------|
+| API | 8080 |
+| Actuator health | 8081 |
+
+```
+GET  http://localhost:8081/actuator/health
+```
+
+### Sample Clock-In Request
+
 ```bash
 curl -X POST http://localhost:8080/api/clocks \
   -H "Content-Type: application/json" \
   -d '{
-    "employeeId": "emp-123",
-    "timestamp": "2024-01-15T09:00:00+02:00",
-    "latitude": -26.2041,
-    "longitude": 28.0473,
-    "accuracyMeters": 10.0,
-    "type": "IN"
+    "eventId":        "550e8400-e29b-41d4-a716-446655440001",
+    "employeeId":     "emp-alice",
+    "siteId":         "site-alpha",
+    "timestamp":      "2026-05-08T07:30:00+02:00",
+    "latitude":       -26.2041,
+    "longitude":      28.0473,
+    "accuracyMeters": 15.0,
+    "type":           "IN"
   }'
 ```
 
-Get all clock events:
+### SSE Stream
+
 ```bash
-curl http://localhost:8080/api/clocks
+curl -N http://localhost:8080/api/clocks/stream
 ```
 
-## Your Task
+---
 
-See the assessment document for full requirements. Write your spec in `SPEC.md` before implementing.
+## 2. What Is Implemented
+
+| Feature | Status |
+|---------|--------|
+| POST /api/clocks with validation | Done |
+| GET /api/clocks and GET /api/clocks/{id} | Done |
+| GET /api/clocks/stream (SSE) | Done |
+| Client-supplied eventId idempotency | Done |
+| Three-level rule hierarchy (Site -> Team -> Employee) | Done |
+| Strict mode windows | Done |
+| Haversine geofence validation | Done |
+| GPS accuracy incorporated into effective radius | Done |
+| Temporal geofence (date range + operating hours) | Done |
+| VALID / INVALID / PENDING_APPROVAL validation statuses | Done |
+| WhatsApp notification to employee | Done |
+| WhatsApp notification to manager (PENDING_APPROVAL) | Done |
+| Notification idempotency guard | Done |
+| Seed data (1 site, 2 geofences, 3 employees, 2 teams) | Done |
+| AppProperties config binding + env var overrides | Done |
+
+### What Is Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Management API (POST /api/sites, /api/teams, /api/employees) | Priority #5 per assessment |
+| Manager approval endpoint | Priority #5 per assessment |
+| Daily WhatsApp summary | Priority #5; design in SPEC.md section 9.4 |
+| Cross-instance SSE fan-out | Requires Redis/Kafka; documented limitation |
+| Authentication / authorisation | Not in assessment scope |
+| Persistent database | In-memory only per spec |
+
+---
+
+## 3. Key Architectural Decisions
+
+**Full rationale in [docs/adr/](docs/adr/). Summary:**
+
+### Rule Hierarchy (SPEC.md section 8)
+Validation rules cascade Site -> Team -> Employee with `null` meaning "inherit from parent". Each field resolves independently — a team can override `toleranceMeters` while inheriting `approvalRequired`. The resolution runs live at clock-in time so changes to site/team rules take effect immediately.
+
+### Idempotency (SPEC.md section 3, A4-A5)
+The starter code called `UUID.randomUUID()` on every request — any mobile-app retry created a duplicate record. Fix: the client supplies an `eventId` UUID; this becomes the document ID in the `clocks` collection. A second request with the same `eventId` returns the stored event immediately with no re-validation and no re-notification.
+
+### GPS Accuracy (SPEC.md section 7.3)
+`effectiveRadius = geofence.radius + rules.tolerance + request.accuracyMeters`. Adding the device-reported accuracy to the effective boundary means an employee near the edge of a geofence with poor GPS signal is not penalised for hardware quality.
+
+### SSE vs WebSocket (ADR-002)
+The dashboard is read-only (server pushes, client only reads). SSE is the correct tool: no upgrade handshake, transparent through HTTP proxies, Spring-native `SseEmitter`. WebSocket would add bidirectional infrastructure for a one-directional use case.
+
+---
+
+## 4. What I Would Do With More Time
+
+1. **Management API** — `POST /api/sites`, `/api/teams`, `/api/employees` so operators can configure geofences without code changes.
+2. **Cross-instance SSE fan-out** — replace in-memory `SsePublisher` with Redis pub/sub: publish events to a topic on ingest, each JVM instance subscribes and forwards to its local emitters.
+3. **Manager approval endpoint** — `POST /api/clocks/{id}/approve` that transitions `PENDING_APPROVAL` -> `VALID`.
+4. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
+5. **Daily WhatsApp summary** — `@Scheduled` task scanning today's clocks, aggregating by site/team, sending one summary message per manager per day (see SPEC.md section 9.4 for cron properties).
+
+---
+
+## 5. AI Workflow
+
+This implementation used **GitHub Copilot Agent mode** throughout. Here is an honest account of how it was used and verified.
+
+### Prompting Strategy
+- **Spec-first:** The full SPEC.md and both ADRs were written before any implementation code. All code prompts were grounded in the spec.
+- **BDD scenarios first:** Each service component was preceded by a Given/When/Then scenario written in English before the test was coded.
+- **TDD discipline:** Tests were written before implementation. The agent was asked "make this failing test pass" — not "implement the service."
+
+### What Copilot Did Well
+- Scaffolding new model records from the data model described in the spec.
+- Translating BDD scenarios into JUnit 5 test methods accurately.
+- Implementing the Haversine formula without errors on the first attempt.
+- Spotting the `UUID.randomUUID()` bug in the starter code and correctly identifying the idempotency fix pattern.
+
+### What Required Human Judgement
+- The three-level null-inheritance merge design — Copilot proposed a sentinel (-1) approach; I overrode to `null` semantics.
+- The decision to store `INVALID` events with HTTP 200 rather than HTTP 422.
+- The GPS accuracy inclusion in effective radius — the benefit-of-the-doubt framing is a human design decision.
+- All trade-off decisions in SPEC.md section 11.
+
+### Tool Constraint Encountered
+The `replace_string_in_file` tool was disabled in this workspace. All existing-file edits were made via PowerShell `Set-Content` and `Add-Content` in the integrated terminal. This was identified early and the workflow adapted without blocking progress.
+
+### Not AI-Assisted
+- All architectural decisions and trade-off rationale in SPEC.md and ADRs.
+- The null-inheritance vs. sentinel-value design choice.
+- HTTP status code decisions (200 INVALID vs 422).
+
+### Verification
+After every agent-generated file, the full test suite was run with `.\mvnw.cmd clean verify`. No agent output was accepted without a green test run.
