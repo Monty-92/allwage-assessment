@@ -48,6 +48,11 @@ public class NotificationService {
             return;
         }
 
+        if (employeePhone == null || employeePhone.isBlank()) {
+            log.warn("Employee phone not set for eventId={}; skipping employee notification", event.id());
+            return;
+        }
+
         String direction = event.type() == ClockType.IN ? "in" : "out";
         String time = event.timestamp().format(TIME_FMT);
 
