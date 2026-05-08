@@ -16,6 +16,7 @@ public class AppProperties {
     private Sse sse = new Sse();
     private Notifications notifications = new Notifications();
     private SeedData seedData = new SeedData();
+    private Summary summary = new Summary();
 
     public Geofence getGeofence() { return geofence; }
     public void setGeofence(Geofence geofence) { this.geofence = geofence; }
@@ -28,6 +29,9 @@ public class AppProperties {
 
     public SeedData getSeedData() { return seedData; }
     public void setSeedData(SeedData seedData) { this.seedData = seedData; }
+
+    public Summary getSummary() { return summary; }
+    public void setSummary(Summary summary) { this.summary = summary; }
 
     public static class Geofence {
         private int defaultToleranceMeters = 20;
@@ -59,5 +63,20 @@ public class AppProperties {
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    public static class Summary {
+        private boolean enabled = false;
+        private String morningCron = "0 0 6 * * MON-FRI";
+        private String eveningCron = "0 0 18 * * MON-FRI";
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public String getMorningCron() { return morningCron; }
+        public void setMorningCron(String morningCron) { this.morningCron = morningCron; }
+
+        public String getEveningCron() { return eveningCron; }
+        public void setEveningCron(String eveningCron) { this.eveningCron = eveningCron; }
     }
 }
