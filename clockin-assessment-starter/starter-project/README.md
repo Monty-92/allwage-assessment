@@ -19,7 +19,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 .\mvnw.cmd --batch-mode clean verify
 ```
 
-All 71 tests must be green before submitting.
+All 86 tests must be green before submitting.
 
 ### Run the Service
 
@@ -81,12 +81,12 @@ curl -N http://localhost:8080/api/clocks/stream
 | Seed data (1 site, 2 geofences, 3 employees, 2 teams) | Done |
 | AppProperties config binding + env var overrides | Done |
 | Management API (POST/GET /api/sites, /api/teams, /api/employees) | Done |
+| Approval resolution (`POST /api/clocks/{id}/approve` and `POST /api/clocks/{id}/reject`) | Done |
 
 ### What Is Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Approval resolution endpoints (`POST /api/clocks/{id}/approve\|reject`) — `PENDING_APPROVAL` status, storage, and manager notification **are** implemented; only the state-transition endpoint is not built | Priority #5 per assessment |
 | Daily WhatsApp summary | Priority #5; design in SPEC.md section 9.4. `app.summary.*` properties exist in `application.properties` as reserved placeholders — no binding in `AppProperties`, no `@Scheduled` service implemented |
 | Cross-instance SSE fan-out | Requires Redis/Kafka; documented limitation |
 | Authentication / authorisation | Not in assessment scope |
@@ -114,10 +114,9 @@ The dashboard is read-only (server pushes, client only reads). SSE is the correc
 
 ## 4. What I Would Do With More Time
 
-1. **Manager approval endpoint** — `POST /api/clocks/{id}/approve` that transitions `PENDING_APPROVAL` -> `VALID`.
-2. **Daily WhatsApp summary** — `@Scheduled` task scanning today's clocks, aggregating by site/team, sending one summary message per manager per day (see SPEC.md section 9.4 for cron properties).
-3. **Cross-instance SSE fan-out** — replace in-memory `SsePublisher` with Redis pub/sub: publish events to a topic on ingest, each JVM instance subscribes and forwards to its local emitters.
-4. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
+1. **Daily WhatsApp summary** — `@Scheduled` task scanning today's clocks, aggregating by site/team, sending one summary message per manager per day (see SPEC.md section 9.4 for cron properties).
+2. **Cross-instance SSE fan-out** — replace in-memory `SsePublisher` with Redis pub/sub: publish events to a topic on ingest, each JVM instance subscribes and forwards to its local emitters.
+3. **WhatsApp retry with dead-letter queue** — wrap `WhatsAppClient.sendMessage()` in a retry decorator (exponential backoff, 3 attempts) with a dead-letter log for failed notifications.
 
 ---
 
