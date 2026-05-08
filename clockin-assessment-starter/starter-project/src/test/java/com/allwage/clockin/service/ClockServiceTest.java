@@ -1,5 +1,6 @@
 package com.allwage.clockin.service;
 
+import com.allwage.clockin.config.AppProperties;
 import com.allwage.clockin.controller.ClockRequest;
 import com.allwage.clockin.model.*;
 import com.allwage.clockin.store.DocumentStore;
@@ -66,7 +67,7 @@ class ClockServiceTest {
     @BeforeEach
     void setUp() {
         store = new DocumentStore();
-        service = new ClockService(store, new RuleResolver(), new GeofenceValidator(),
+        service = new ClockService(store, new RuleResolver(new AppProperties()), new GeofenceValidator(),
                 notificationService, ssePublisher);
 
         Map<DayOfWeek, TimeRange> hours = Map.of(

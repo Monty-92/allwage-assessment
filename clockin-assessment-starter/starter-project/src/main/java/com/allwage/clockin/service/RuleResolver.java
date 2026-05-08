@@ -1,5 +1,6 @@
 package com.allwage.clockin.service;
 
+import com.allwage.clockin.config.AppProperties;
 import com.allwage.clockin.model.*;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,12 @@ import java.util.List;
  */
 @Component
 public class RuleResolver {
+
+    private final AppProperties appProperties;
+
+    public RuleResolver(AppProperties appProperties) {
+        this.appProperties = appProperties;
+    }
 
     /**
      * Resolves effective rules for the given employee at the given site.
@@ -32,7 +39,9 @@ public class RuleResolver {
         }
 
         // Level 1: start with site defaults
-        int tolerance = base.toleranceMeters();
+        int tolerance = base.toleranceMeters() != null
+                ? base.toleranceMeters()
+                : appProperties.getGeofence().getDefaultToleranceMeters();
         List<StrictModeWindow> strictWindows = base.strictModeWindows();
         boolean approvalRequired = base.approvalRequired();
 
@@ -58,7 +67,9 @@ public class RuleResolver {
         if (strictWindows != null) {
             for (StrictModeWindow window : strictWindows) {
                 if (window.contains(clockTime.toLocalTime())) {
-                    tolerance = window.toleranceMeters();
+                    tolerance = window.toleranceMeters() != null
+                            ? window.toleranceMeters()
+                            : appProperties.getGeofence().getStrictModeToleranceMeters();
                     break;
                 }
             }

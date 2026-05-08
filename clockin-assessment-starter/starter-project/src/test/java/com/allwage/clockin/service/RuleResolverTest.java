@@ -1,5 +1,6 @@
 package com.allwage.clockin.service;
 
+import com.allwage.clockin.config.AppProperties;
 import com.allwage.clockin.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class RuleResolverTest {
 
     @BeforeEach
     void setUp() {
-        resolver = new RuleResolver();
+        resolver = new RuleResolver(new AppProperties());
 
         SiteRules siteRules = new SiteRules(30, List.of(), false);
         siteAlpha = new Site("site-alpha", "Alpha Construction", "+27821000001", siteRules, List.of());
