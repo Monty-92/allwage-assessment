@@ -21,9 +21,13 @@ jobs:
           distribution: eclipse-temurin
           cache: maven
 
+      - name: Make wrapper executable
+        working-directory: clockin-assessment-starter/starter-project
+        run: chmod +x mvnw
+
       - name: Build and test
         working-directory: clockin-assessment-starter/starter-project
-        run: mvn --batch-mode clean verify
+        run: ./mvnw --batch-mode clean verify
 
       - name: Publish test report
         uses: mikepenz/action-junit-report@v4
