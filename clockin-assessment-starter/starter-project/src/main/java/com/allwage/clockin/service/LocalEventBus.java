@@ -27,6 +27,6 @@ public class LocalEventBus implements EventBus {
 
     @Override
     public void publish(@NonNull ClockEvent event) {
-        throw new UnsupportedOperationException("not implemented");
+        ssePublisher.publish(event);
     }
 }
