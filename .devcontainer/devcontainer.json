@@ -1,0 +1,39 @@
+{
+  "name": "Allwage Clock-In (Java 21)",
+  "image": "mcr.microsoft.com/devcontainers/java:21-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installMaven": true,
+      "mavenVersion": "3.9"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-spring-initializr",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-spring-boot-dashboard",
+        "redhat.java",
+        "vscjava.vscode-maven"
+      ],
+      "settings": {
+        "java.jdt.ls.java.home": "/usr/local/lib/jvm/java-21-openj9",
+        "editor.formatOnSave": true,
+        "maven.executable.path": "/usr/local/sdkman/candidates/maven/current/bin/mvn"
+      }
+    }
+  },
+  "workspaceFolder": "/workspaces/allwage-assessment",
+  "postCreateCommand": "cd clockin-assessment-starter/starter-project && mvn dependency:resolve -q",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "Clock-In Service",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteUser": "vscode"
+}
