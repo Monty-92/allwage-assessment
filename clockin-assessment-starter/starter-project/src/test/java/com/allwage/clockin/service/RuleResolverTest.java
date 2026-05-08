@@ -151,4 +151,74 @@ class RuleResolverTest {
 
         assertThat(rules.toleranceMeters()).isEqualTo(30);
     }
+
+    // ---- Additional edge cases ----
+
+    /**
+     * GIVEN team overrides only tolerance (not approvalRequired)
+     * WHEN resolveRules
+     * THEN tolerance=15 (from team), approvalRequired=false (inherited from site)
+     */
+    @Test
+    void teamOverridesToleranceOnly_approvalInheritsFromSite() {
+        Team teamToleranceOnly = new Team("team-tolerance-only", "site-alpha", "Tolerance Only",
+                new TeamRules(15, null, null));
+
+        EffectiveRules rules = resolver.resolveRules(siteAlpha, teamToleranceOnly, alice, "site-alpha", TUESDAY_MORNING);
+
+        assertThat(rules.toleranceMeters()).isEqualTo(15);
+        assertThat(rules.approvalRequired()).isFalse();
+    }
+
+    /**
+     * GIVEN team sets approvalRequired=true AND employee overrides approvalRequired=false
+     * WHEN resolveRules
+     * THEN approvalRequired=false (employee override wins)
+     */
+    @Test
+    void employeeOverridesApprovalRequired_backToFalse() {
+        Employee empOverridesApproval = new Employee("emp-override", "Override", "+27821999999",
+                Map.of("site-alpha", "team-contractors"),
+                Map.of("site-alpha", new EmployeeRules(null, null, false)));
+
+        EffectiveRules rules = resolver.resolveRules(siteAlpha, teamContractors, empOverridesApproval, "site-alpha", TUESDAY_MORNING);
+
+        // teamContractors has approvalRequired=true; employee overrides back to false
+        assertThat(rules.approvalRequired()).isFalse();
+        // tolerance comes from team (10) since employee didn't override it
+        assertThat(rules.toleranceMeters()).isEqualTo(10);
+    }
+
+    /**
+     * GIVEN employee has a null ruleOverrides map (not an empty map)
+     * WHEN resolveRules
+     * THEN employee level is skipped and team rules are used (no NullPointerException)
+     */
+    @Test
+    void employee_withNullRuleOverridesMap_inheritsFromTeam() {
+        Employee empNullOverrides = new Employee("emp-null", "Null Overrides", "+27821888888",
+                Map.of("site-alpha", "team-contractors"),
+                null); // explicitly null, not Map.of()
+
+        EffectiveRules rules = resolver.resolveRules(siteAlpha, teamContractors, empNullOverrides, "site-alpha", TUESDAY_MORNING);
+
+        assertThat(rules.toleranceMeters()).isEqualTo(10);
+        assertThat(rules.approvalRequired()).isTrue();
+    }
+
+    /**
+     * GIVEN site has null SiteRules (misconfigured data)
+     * WHEN resolveRules is called
+     * THEN IllegalStateException is thrown with the site id in the message
+     */
+    @Test
+    void nullSiteRules_throwsIllegalStateException() {
+        Site siteNoRules = new Site("site-alpha", "Alpha Construction", "+27821000001",
+                null, List.of());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                resolver.resolveRules(siteNoRules, teamDayShift, alice, "site-alpha", TUESDAY_MORNING))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("site-alpha");
+    }
 }

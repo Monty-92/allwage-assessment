@@ -209,11 +209,137 @@ class GeofenceValidatorTest {
         assertThat(status).isEqualTo(ValidationStatus.INVALID);
     }
 
+    // ---- Additional edge-case tests ----
+
+    /**
+     * GIVEN employee is exactly on the geofence radius (distance == radiusMeters)
+     * AND tolerance=0, accuracyMeters=0
+     * WHEN validate
+     * THEN result is VALID (boundary inclusive: distance <= effectiveRadius)
+     */
+    @Test
+    void exactlyOnGeofenceRadius_withZeroToleranceAndAccuracy_isValid() {
+        double[] coords = offsetByMeters(CENTRE_LAT, CENTRE_LON, RADIUS_M);
+        ValidationStatus status = validator.validate(
+                List.of(mainGate), coords[0], coords[1], 0.0,
+                new EffectiveRules(0, false), MON_06_00);
+
+        assertThat(status).isEqualTo(ValidationStatus.VALID);
+    }
+
+    /**
+     * GIVEN clockTime = 18:00:00 (exactly at the exclusive end of the operating window)
+     * WHEN employee is at the site centre
+     * THEN result is INVALID (TimeRange.contains uses [from, to) — end exclusive)
+     */
+    @Test
+    void atExactEndOfOperatingHours_isInvalid() {
+        ZonedDateTime closeTime = MON_06_00.withHour(18).withMinute(0).withSecond(0);
+        ValidationStatus status = validator.validate(
+                List.of(mainGate), CENTRE_LAT, CENTRE_LON, 0.0,
+                new EffectiveRules(0, false), closeTime);
+
+        assertThat(status).isEqualTo(ValidationStatus.INVALID);
+    }
+
+    /**
+     * GIVEN clockTime = 17:59:00 (one minute before the exclusive closing time)
+     * WHEN employee is at the site centre
+     * THEN result is VALID (inside the operating window)
+     */
+    @Test
+    void oneMinuteBeforeClosing_isValid() {
+        ZonedDateTime beforeClose = MON_06_00.withHour(17).withMinute(59).withSecond(0);
+        ValidationStatus status = validator.validate(
+                List.of(mainGate), CENTRE_LAT, CENTRE_LON, 0.0,
+                new EffectiveRules(0, false), beforeClose);
+
+        assertThat(status).isEqualTo(ValidationStatus.VALID);
+    }
+
+    /**
+     * GIVEN clockDate == effectiveTo (2026-12-31, a Thursday)
+     * WHEN employee is at site centre during operating hours
+     * THEN result is VALID (effectiveTo is inclusive)
+     */
+    @Test
+    void onEffectiveToDate_isValid() {
+        // 2026-12-31 is a Thursday — in the Mon-Fri schedule
+        ZonedDateTime lastDay = ZonedDateTime.of(2026, 12, 31, 9, 0, 0, 0, ZoneOffset.ofHours(2));
+        ValidationStatus status = validator.validate(
+                List.of(mainGate), CENTRE_LAT, CENTRE_LON, 0.0,
+                new EffectiveRules(0, false), lastDay);
+
+        assertThat(status).isEqualTo(ValidationStatus.VALID);
+    }
+
+    /**
+     * GIVEN two active geofences and employee is outside both
+     * WHEN validate
+     * THEN result is INVALID
+     */
+    @Test
+    void multipleGeofences_outsideAll_isInvalid() {
+        Geofence second = buildGeofenceAt(CENTRE_LAT + 0.009, CENTRE_LON, 100.0,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+                Map.of(DayOfWeek.MONDAY, new TimeRange(LocalTime.of(6, 0), LocalTime.of(18, 0))));
+
+        // Employee is ~2 km from CENTRE — outside both fences
+        double[] farAway = offsetByMeters(CENTRE_LAT, CENTRE_LON, 2_000.0);
+        ValidationStatus status = validator.validate(
+                List.of(mainGate, second), farAway[0], farAway[1], 0.0,
+                new EffectiveRules(0, false), MON_06_00);
+
+        assertThat(status).isEqualTo(ValidationStatus.INVALID);
+    }
+
+    /**
+     * GIVEN two active geofences and employee is outside the first but inside the second
+     * WHEN validate
+     * THEN result is VALID (any active fence match is sufficient)
+     */
+    @Test
+    void multipleGeofences_outsideFirst_insideSecond_isValid() {
+        // Second geofence centred 1 km north, also 100 m radius
+        double secondCentreLat = CENTRE_LAT + 0.009;
+        Geofence second = buildGeofenceAt(secondCentreLat, CENTRE_LON, 100.0,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+                Map.of(DayOfWeek.MONDAY, new TimeRange(LocalTime.of(6, 0), LocalTime.of(18, 0))));
+
+        // Employee at the centre of the second geofence (inside second, outside first)
+        ValidationStatus status = validator.validate(
+                List.of(mainGate, second), secondCentreLat, CENTRE_LON, 0.0,
+                new EffectiveRules(0, false), MON_06_00);
+
+        assertThat(status).isEqualTo(ValidationStatus.VALID);
+    }
+
+    /**
+     * GIVEN a null geofence list (misconfigured site)
+     * WHEN validate is called
+     * THEN result is INVALID without throwing NullPointerException
+     */
+    @Test
+    void nullGeofencesList_returnsInvalidWithoutException() {
+        ValidationStatus status = validator.validate(
+                null, CENTRE_LAT, CENTRE_LON, 0.0,
+                new EffectiveRules(0, false), MON_06_00);
+
+        assertThat(status).isEqualTo(ValidationStatus.INVALID);
+    }
+
     // ---- helpers ----
 
     private Geofence buildGeofence(double radius, LocalDate from, LocalDate to,
                                     Map<DayOfWeek, TimeRange> hours) {
         return new Geofence("g1", "Test Fence", CENTRE_LAT, CENTRE_LON, radius,
+                new ZoneSchedule(hours, from, to));
+    }
+
+    private Geofence buildGeofenceAt(double lat, double lon, double radius,
+                                      LocalDate from, LocalDate to,
+                                      Map<DayOfWeek, TimeRange> hours) {
+        return new Geofence("g2", "Second Fence", lat, lon, radius,
                 new ZoneSchedule(hours, from, to));
     }
 
@@ -226,3 +352,4 @@ class GeofenceValidatorTest {
         return new double[]{lat + deltaLat, lon};
     }
 }
+
