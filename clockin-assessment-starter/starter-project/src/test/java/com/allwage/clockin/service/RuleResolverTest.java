@@ -221,4 +221,36 @@ class RuleResolverTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("site-alpha");
     }
+
+    /**
+     * GIVEN SiteRules with null toleranceMeters (not explicitly set)
+     * WHEN resolveRules is called
+     * THEN tolerance falls back to app.geofence.default-tolerance-meters (20)
+     */
+    @Test
+    void resolveRules_siteRulesNullTolerance_usesDefaultFromProperties() {
+        SiteRules rulesNullTolerance = new SiteRules(null, List.of(), false);
+        Site siteNullTolerance = new Site("site-alpha", "Alpha", "+27821000001", rulesNullTolerance, List.of());
+
+        EffectiveRules rules = resolver.resolveRules(siteNullTolerance, teamDayShift, alice, "site-alpha", TUESDAY_MORNING);
+
+        assertThat(rules.toleranceMeters()).isEqualTo(20); // default from AppProperties
+    }
+
+    /**
+     * GIVEN a StrictModeWindow with null toleranceMeters
+     * WHEN clock time falls inside that window
+     * THEN tolerance falls back to app.geofence.strict-mode-tolerance-meters (5)
+     */
+    @Test
+    void resolveRules_strictWindowNullTolerance_usesStrictModeFromProperties() {
+        SiteRules rulesWithNullStrictWindow = new SiteRules(30,
+                List.of(new StrictModeWindow(LocalTime.of(7, 0), LocalTime.of(9, 0), null)),
+                false);
+        Site siteWithWindow = new Site("site-alpha", "Alpha", "+27821000001", rulesWithNullStrictWindow, List.of());
+
+        EffectiveRules rules = resolver.resolveRules(siteWithWindow, teamDayShift, alice, "site-alpha", TUESDAY_MORNING);
+
+        assertThat(rules.toleranceMeters()).isEqualTo(5); // strict-mode default from AppProperties
+    }
 }
