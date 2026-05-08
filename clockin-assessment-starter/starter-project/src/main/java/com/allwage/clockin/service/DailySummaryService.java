@@ -46,7 +46,7 @@ public class DailySummaryService {
      */
     @Scheduled(cron = "${app.summary.morning-cron}")
     public void sendMorningSummary() {
-        throw new UnsupportedOperationException("not implemented");
+        sendSummaryForDate(LocalDate.now().minusDays(1));
     }
 
     /**
@@ -54,7 +54,7 @@ public class DailySummaryService {
      */
     @Scheduled(cron = "${app.summary.evening-cron}")
     public void sendEveningSummary() {
-        throw new UnsupportedOperationException("not implemented");
+        sendSummaryForDate(LocalDate.now());
     }
 
     /**
@@ -63,6 +63,55 @@ public class DailySummaryService {
      * Skips sites with no events that day. No-ops when summary is disabled.
      */
     public void sendSummaryForDate(@NonNull LocalDate date) {
-        throw new UnsupportedOperationException("not implemented");
+        if (!appProperties.getSummary().isEnabled()) {
+            log.debug("Daily summary disabled; skipping for date={}", date);
+            return;
+        }
+
+        List<ClockEvent> allEvents = store.findAll("clocks", ClockEvent.class);
+
+        Map<String, List<ClockEvent>> bySite = allEvents.stream()
+                .filter(e -> e.timestamp().toLocalDate().equals(date))
+                .collect(Collectors.groupingBy(ClockEvent::siteId));
+
+        if (bySite.isEmpty()) {
+            log.debug("No clock events for date={}; skipping summary", date);
+            return;
+        }
+
+        for (Map.Entry<String, List<ClockEvent>> entry : bySite.entrySet()) {
+            String siteId = entry.getKey();
+            List<ClockEvent> siteEvents = entry.getValue();
+
+            Site site = store.findById("sites", siteId, Site.class).orElse(null);
+            if (site == null) {
+                log.warn("Site not found for siteId={}; skipping summary", siteId);
+                continue;
+            }
+
+            String managerPhone = site.managerPhoneNumber();
+            if (managerPhone == null || managerPhone.isBlank()) {
+                log.warn("Site {} has no manager phone; skipping summary", siteId);
+                continue;
+            }
+
+            String message = buildSummaryMessage(site.name(), date, siteEvents);
+            try {
+                boolean sent = whatsAppClient.sendMessage(managerPhone, message);
+                if (!sent) {
+                    log.warn("Summary message not delivered for siteId={} date={}", siteId, date);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to send summary for siteId={} date={}: {}", siteId, date, e.getMessage());
+            }
+        }
+    }
+
+    private String buildSummaryMessage(String siteName, LocalDate date, List<ClockEvent> events) {
+        long inCount  = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN).count();
+        long outCount = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.OUT).count();
+        return "Daily attendance summary for " + siteName + " on " + date
+                + ": " + events.size() + " event(s) — "
+                + inCount + " clock-in(s), " + outCount + " clock-out(s).";
     }
 }
