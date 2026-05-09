@@ -48,24 +48,26 @@ public class NotificationService {
             return;
         }
 
-        if (employeePhone == null || employeePhone.isBlank()) {
-            log.warn("Employee phone not set for eventId={}; skipping employee notification", event.id());
-            return;
-        }
-
         String direction = event.type() == ClockType.IN ? "in" : "out";
         String time = event.timestamp().format(TIME_FMT);
 
-        String employeeMsg = buildEmployeeMessage(event.validationStatus(), event.type(), siteName, time);
-        boolean sent = trySend(employeePhone, employeeMsg, event.id());
+        boolean anySent = false;
+
+        if (employeePhone == null || employeePhone.isBlank()) {
+            log.warn("Employee phone not set for eventId={}; skipping employee notification", event.id());
+        } else {
+            String employeeMsg = buildEmployeeMessage(event.validationStatus(), event.type(), siteName, time);
+            anySent = trySend(employeePhone, employeeMsg, event.id());
+        }
 
         if (event.validationStatus() == ValidationStatus.PENDING_APPROVAL && managerPhone != null) {
             String managerMsg = "Approval required: " + employeeName + " clocked " + direction
                     + " at " + siteName + " at " + time + " SAST (outside primary zone).";
-            trySend(managerPhone, managerMsg, event.id());
+            boolean managerSent = trySend(managerPhone, managerMsg, event.id());
+            anySent = anySent || managerSent;
         }
 
-        if (sent) {
+        if (anySent) {
             store.save("notifications", guardKey, guardKey);
         }
     }
