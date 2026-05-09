@@ -44,6 +44,12 @@ import static org.mockito.Mockito.*;
  * GIVEN 3 employees clocked IN, 2 then clocked OUT
  *   WHEN sendSummaryForDate() is called   THEN message mentions headcount of 1 currently on-site
  *
+ * GIVEN an employee's most recent event is an INVALID clock-in
+ *   WHEN sendSummaryForDate() is called   THEN that employee is NOT counted in headcount
+ *
+ * GIVEN a clock event stored with a UTC timestamp that crosses midnight into the SAST date
+ *   WHEN sendSummaryForDate() is called for that SAST date   THEN the event is included
+ *
  * GIVEN WhatsAppClient returns false (send failure)
  *   WHEN sendSummaryForDate() is called   THEN no exception is thrown
  */
@@ -251,5 +257,47 @@ class DailySummaryServiceTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(whatsAppClient).sendMessage(eq(SITE_A_MANAGER), captor.capture());
         assertThat(captor.getValue()).containsIgnoringCase("1 currently on-site");
+    }
+
+    // --------------------------------------------------------
+    // Headcount — INVALID clock-ins must NOT count as on-site
+    // --------------------------------------------------------
+
+    @Test
+    void sendSummaryForDate_invalidClockIn_notCountedInHeadcount() {
+        service = serviceWithSummaryEnabled(true);
+        // emp-1: INVALID clock-in — should NOT count (still outside geofence)
+        // emp-2: VALID clock-in   — should count as on-site
+        // Expected headcount = 1
+        saveEvent("e-invalid", "emp-1", SITE_A_ID, TODAY, ClockType.IN, ValidationStatus.INVALID);
+        saveEvent("e-valid",   "emp-2", SITE_A_ID, TODAY, ClockType.IN, ValidationStatus.VALID);
+        when(whatsAppClient.sendMessage(any(), any())).thenReturn(true);
+
+        service.sendSummaryForDate(TODAY);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(whatsAppClient).sendMessage(eq(SITE_A_MANAGER), captor.capture());
+        assertThat(captor.getValue()).containsIgnoringCase("1 currently on-site");
+    }
+
+    // --------------------------------------------------------
+    // UTC timestamps must be converted to SAST before date comparison
+    // --------------------------------------------------------
+
+    @Test
+    void sendSummaryForDate_utcTimestampCrossingMidnight_filteredBySASTDate() {
+        service = serviceWithSummaryEnabled(true);
+        // 2026-05-03T22:30:00Z = 2026-05-04T00:30:00+02:00 (SAST)
+        // Must be included when querying for TODAY = 2026-05-04
+        ZonedDateTime utcTs = ZonedDateTime.of(2026, 5, 3, 22, 30, 0, 0, ZoneOffset.UTC);
+        store.save("clocks", "e-utc", new ClockEvent(
+                "e-utc", "emp-utc", SITE_A_ID, utcTs,
+                -26.2041, 28.0473, 5.0,
+                ClockType.IN, ValidationStatus.VALID, null));
+        when(whatsAppClient.sendMessage(any(), any())).thenReturn(true);
+
+        service.sendSummaryForDate(TODAY);
+
+        verify(whatsAppClient, times(1)).sendMessage(eq(SITE_A_MANAGER), any());
     }
 }
