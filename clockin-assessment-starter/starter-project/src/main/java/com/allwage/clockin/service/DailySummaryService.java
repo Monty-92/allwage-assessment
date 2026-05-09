@@ -74,7 +74,7 @@ public class DailySummaryService {
         List<ClockEvent> allEvents = store.findAll("clocks", ClockEvent.class);
 
         Map<String, List<ClockEvent>> bySite = allEvents.stream()
-                .filter(e -> e.timestamp().toLocalDate().equals(date))
+                .filter(e -> e.timestamp().withZoneSameInstant(SAST).toLocalDate().equals(date))
                 .collect(Collectors.groupingBy(ClockEvent::siteId));
 
         if (bySite.isEmpty()) {
@@ -123,7 +123,8 @@ public class DailySummaryService {
                         e -> e,
                         (a, b) -> a.timestamp().isAfter(b.timestamp()) ? a : b))
                 .values().stream()
-                .filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN)
+                .filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN
+                          && e.validationStatus() == com.allwage.clockin.model.ValidationStatus.VALID)
                 .count();
         return "Daily attendance summary for " + siteName + " on " + date
                 + ": " + events.size() + " event(s) — "
