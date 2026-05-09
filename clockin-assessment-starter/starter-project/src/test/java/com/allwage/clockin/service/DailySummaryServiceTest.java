@@ -38,6 +38,12 @@ import static org.mockito.Mockito.*;
  * GIVEN summary is enabled and the message contains event counts
  *   WHEN sendSummaryForDate() is called   THEN message mentions site name and event count
  *
+ * GIVEN summary is enabled and some events have INVALID or PENDING_APPROVAL status
+ *   WHEN sendSummaryForDate() is called   THEN message mentions the anomaly count
+ *
+ * GIVEN 3 employees clocked IN, 2 then clocked OUT
+ *   WHEN sendSummaryForDate() is called   THEN message mentions headcount of 1 currently on-site
+ *
  * GIVEN WhatsAppClient returns false (send failure)
  *   WHEN sendSummaryForDate() is called   THEN no exception is thrown
  */
@@ -79,11 +85,16 @@ class DailySummaryServiceTest {
     }
 
     private void saveEvent(String eventId, String siteId, LocalDate date) {
+        saveEvent(eventId, "emp-" + eventId, siteId, date, ClockType.IN, ValidationStatus.VALID);
+    }
+
+    private void saveEvent(String eventId, String employeeId, String siteId, LocalDate date,
+                           ClockType type, ValidationStatus status) {
         ZonedDateTime ts = date.atTime(8, 30).atOffset(SAST).toZonedDateTime();
         store.save("clocks", eventId, new ClockEvent(
-                eventId, "emp-1", siteId, ts,
+                eventId, employeeId, siteId, ts,
                 -26.2041, 28.0473, 5.0,
-                ClockType.IN, ValidationStatus.VALID, null));
+                type, status, status == ValidationStatus.VALID ? null : "reason"));
     }
 
     // --------------------------------------------------------
@@ -144,6 +155,8 @@ class DailySummaryServiceTest {
         String msg = msgCaptor.getValue();
         assertThat(msg).contains(SITE_A_NAME);
         assertThat(msg).contains("3");
+        assertThat(msg).containsIgnoringCase("currently on-site");
+        assertThat(msg).containsIgnoringCase("anomaly");
     }
 
     // --------------------------------------------------------
@@ -192,5 +205,51 @@ class DailySummaryServiceTest {
         service.sendSummaryForDate(TODAY);
 
         verifyNoInteractions(whatsAppClient);
+    }
+
+    // --------------------------------------------------------
+    // Anomaly count in summary message
+    // --------------------------------------------------------
+
+    @Test
+    void sendSummaryForDate_eventsWithAnomalies_messageIncludesAnomalyCount() {
+        service = serviceWithSummaryEnabled(true);
+        // 1 VALID, 1 INVALID, 1 PENDING_APPROVAL — 2 anomalies
+        saveEvent("e-valid",   "emp-1", SITE_A_ID, TODAY, ClockType.IN, ValidationStatus.VALID);
+        saveEvent("e-invalid", "emp-2", SITE_A_ID, TODAY, ClockType.IN, ValidationStatus.INVALID);
+        saveEvent("e-pending", "emp-3", SITE_A_ID, TODAY, ClockType.IN, ValidationStatus.PENDING_APPROVAL);
+        when(whatsAppClient.sendMessage(any(), any())).thenReturn(true);
+
+        service.sendSummaryForDate(TODAY);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(whatsAppClient).sendMessage(eq(SITE_A_MANAGER), captor.capture());
+        assertThat(captor.getValue()).containsIgnoringCase("2 anomaly");
+    }
+
+    // --------------------------------------------------------
+    // On-site headcount in summary message
+    // --------------------------------------------------------
+
+    @Test
+    void sendSummaryForDate_someEmployeesClockedOut_messageIncludesCorrectHeadcount() {
+        service = serviceWithSummaryEnabled(true);
+        // emp-1: clocked IN only  → still on site
+        // emp-2: clocked IN then OUT → no longer on site
+        // emp-3: clocked IN then OUT → no longer on site
+        // expected headcount = 1
+        ZonedDateTime base = TODAY.atTime(8, 0).atOffset(SAST).toZonedDateTime();
+        store.save("clocks", "e1-in",  new ClockEvent("e1-in",  "emp-1", SITE_A_ID, base,            -26.2041, 28.0473, 5.0, ClockType.IN,  ValidationStatus.VALID, null));
+        store.save("clocks", "e2-in",  new ClockEvent("e2-in",  "emp-2", SITE_A_ID, base,            -26.2041, 28.0473, 5.0, ClockType.IN,  ValidationStatus.VALID, null));
+        store.save("clocks", "e2-out", new ClockEvent("e2-out", "emp-2", SITE_A_ID, base.plusHours(4), -26.2041, 28.0473, 5.0, ClockType.OUT, ValidationStatus.VALID, null));
+        store.save("clocks", "e3-in",  new ClockEvent("e3-in",  "emp-3", SITE_A_ID, base,            -26.2041, 28.0473, 5.0, ClockType.IN,  ValidationStatus.VALID, null));
+        store.save("clocks", "e3-out", new ClockEvent("e3-out", "emp-3", SITE_A_ID, base.plusHours(6), -26.2041, 28.0473, 5.0, ClockType.OUT, ValidationStatus.VALID, null));
+        when(whatsAppClient.sendMessage(any(), any())).thenReturn(true);
+
+        service.sendSummaryForDate(TODAY);
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(whatsAppClient).sendMessage(eq(SITE_A_MANAGER), captor.capture());
+        assertThat(captor.getValue()).containsIgnoringCase("1 currently on-site");
     }
 }
