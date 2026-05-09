@@ -19,7 +19,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 .\mvnw.cmd --batch-mode clean verify
 ```
 
-All 102 tests must be green before submitting.
+All 112 tests must be green before submitting.
 
 ### Run the Service
 
@@ -158,7 +158,7 @@ When `APP_SSE_REDIS_ENABLED=true`, each clock-in serializes the `ClockEvent` as 
 - `DailySummaryService` — `@Scheduled` morning and evening cron, scans today's/yesterday's `ClockEvent`s, groups by `siteId`, sends a formatted summary to each site manager. Gated by `app.summary.enabled=false` by default.
 
 **Tests**
-- 102 tests across 14 test classes. Every service component has a dedicated unit test class. `ClockControllerTest` and `ManagementControllerTest` use `@SpringBootTest` + `MockMvc`. `GeofenceValidatorTest` covers 17 cases including temporal boundary conditions. BDD-first: each test class maps to Given/When/Then scenarios written before the implementation.
+- 112 tests across 15 test classes. Every service component has a dedicated unit test class. `ClockControllerTest` and `ManagementControllerTest` use `@SpringBootTest` + `MockMvc`. `GeofenceValidatorTest` covers 17 cases including temporal boundary conditions. BDD-first: each test class maps to Given/When/Then scenarios written before the implementation.
 
 ### What Was Added Beyond the Original Spec
 
