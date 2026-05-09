@@ -11,6 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class DailySummaryService {
 
     private static final Logger log = LoggerFactory.getLogger(DailySummaryService.class);
+    private static final ZoneId SAST = ZoneId.of("Africa/Johannesburg");
 
     private final DocumentStore store;
     private final WhatsAppClient whatsAppClient;
@@ -46,7 +49,7 @@ public class DailySummaryService {
      */
     @Scheduled(cron = "${app.summary.morning-cron}")
     public void sendMorningSummary() {
-        sendSummaryForDate(LocalDate.now().minusDays(1));
+        sendSummaryForDate(LocalDate.now(SAST).minusDays(1));
     }
 
     /**
@@ -54,7 +57,7 @@ public class DailySummaryService {
      */
     @Scheduled(cron = "${app.summary.evening-cron}")
     public void sendEveningSummary() {
-        sendSummaryForDate(LocalDate.now());
+        sendSummaryForDate(LocalDate.now(SAST));
     }
 
     /**
@@ -108,10 +111,23 @@ public class DailySummaryService {
     }
 
     private String buildSummaryMessage(String siteName, LocalDate date, List<ClockEvent> events) {
-        long inCount  = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN).count();
-        long outCount = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.OUT).count();
+        long inCount    = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN).count();
+        long outCount   = events.stream().filter(e -> e.type() == com.allwage.clockin.model.ClockType.OUT).count();
+        long anomalies  = events.stream()
+                .filter(e -> e.validationStatus() == com.allwage.clockin.model.ValidationStatus.INVALID
+                          || e.validationStatus() == com.allwage.clockin.model.ValidationStatus.PENDING_APPROVAL)
+                .count();
+        long headcount  = events.stream()
+                .collect(Collectors.toMap(
+                        com.allwage.clockin.model.ClockEvent::employeeId,
+                        e -> e,
+                        (a, b) -> a.timestamp().isAfter(b.timestamp()) ? a : b))
+                .values().stream()
+                .filter(e -> e.type() == com.allwage.clockin.model.ClockType.IN)
+                .count();
         return "Daily attendance summary for " + siteName + " on " + date
                 + ": " + events.size() + " event(s) — "
-                + inCount + " clock-in(s), " + outCount + " clock-out(s).";
+                + inCount + " clock-in(s), " + outCount + " clock-out(s), "
+                + headcount + " currently on-site, " + anomalies + " anomaly(ies).";
     }
 }
